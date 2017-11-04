@@ -72,7 +72,7 @@ class preprocess(object):
         Breaks text into english words.
         
         params:
-            data: a panda dataframe with column 'title' containing
+            data: a panda dataframe with column containing
             text.
             
         output:
