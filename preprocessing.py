@@ -9,6 +9,7 @@ text.
 # Load libraries
 import pandas as pd
 from nltk.data import load
+from nltk.corpus import stopwords
 
 class preprocess(object):
     
@@ -52,8 +53,21 @@ class preprocess(object):
         
         # Remove stop words
         if (self.rm_stopwords):
-            pass
-
+            
+            # Get stop words
+            stop = stopwords.words('english')
+            
+            # Create function to remove stop words
+            stop_word_func = lambda x: ' '.join(
+                            [word for word in x.split() if word not in (stop)]
+                            )
+            
+            # Remove stop words from the body column
+            data['body'] = data['body'].apply(stop_word_func)
+                    
+                    
+            # Remove stop words from the title column
+            data['title'] = data['title'].apply(stop_word_func)
         
         return data
 
@@ -92,3 +106,4 @@ prep = preprocess()
 jokeData = prep.cleanData(jokeData)
 words = prep.tokenizeText(jokeData['title'])
 print(words[1])
+print(jokeData.head(n=5))
