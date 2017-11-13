@@ -124,6 +124,12 @@ def main():
     # http://mccormickml.com/2016/04/12/googles-pretrained-word2vec-model-in-python/
     # you'll need to d/l first (1.6 GB) and note it will take several minutes to load
     python embedtool.py --query king --embeddings_file GoogleNews-vectors-negative300.bin.gz
+
+
+    # Info and Export also work:
+    python embedtool.py --export --embeddings_file jokes_cbow.model
+    python embedtool.py --info --embeddings_file jokes_cbow.model
+   
     '''
     parser = argparse.ArgumentParser(description=description, epilog=epilog, 
      formatter_class=argparse.RawTextHelpFormatter)
@@ -133,7 +139,8 @@ def main():
                          help="query the specified embeddings model: 'king' or 'most_similar(positive=['king', 'man'], negative=[woman])'")
     parser.add_argument('--export', dest='export', action='store_true',
                          help="export as CSV to std out (redirect as required).")  
-    parser.add_argument('--info', dest='info', action='store_true')
+    parser.add_argument('--info', dest='info', action='store_true',
+                         help='dump out some info about the embeddings (vector size, vocab size ...)')
 
     args = parser.parse_args()
     make_embeddings = args.make_embeddings
