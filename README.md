@@ -9,3 +9,4 @@ are compared.  The synset of the title words that is closest to a synset in the 
 I have discovered that it is really hard for a human to determine the topic of a joke.  For example, in the joke
 "Time flies like an arrow.  Fruit flies like a banana", what is the topic?
 
+
