@@ -13,8 +13,9 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 from sklearn.tree import DecisionTreeClassifier
 
-from pandas import read_json
 from gensim.models import word2vec
+from gensim.models import doc2vec
+from gensim.models.doc2vec import TaggedDocument
 from sklearn.feature_extraction.text import CountVectorizer
 '''
 Build a tool that can be used to help efforts with word embeddings
@@ -26,6 +27,7 @@ Build a tool that can be used to help efforts with word embeddings
 embedtool.py --train -i classified_self.pointcloud.txt --algorithm DT --model my_decision_tree.model
 embedtool.py --predict -i tile_unclass.txt -model my_decision_tree.model 
 embedtool.py --score -i classified_input.txt -model my_decision_tree.model
+
 '''
 
 class EmbeddingsTool():
@@ -33,24 +35,43 @@ class EmbeddingsTool():
     def __init__(self, *args, **kwargs):
 
         self.embeddings_file = kwargs['embeddings_file']
+        self.doc2vec = kwargs['doc2vec']
         time0 = time.time()
         print('loading embeddings file {}'.format(self.embeddings_file))
         if os.path.exists(self.embeddings_file):
             if 'GoogleNews' in self.embeddings_file: # Google's pre-trained model
                self.embeddings = KeyedVectors.load_word2vec_format(self.embeddings_file, binary=True)
             else:  # Some other model, presumably the one we generated in "make_embeddings"
-               self.embeddings = KeyedVectors.load(self.embeddings_file)
+                if self.doc2vec:
+                    self.embeddings = doc2vec.Doc2Vec.load(self.embeddings_file)
+                else:
+                    self.embeddings = KeyedVectors.load(self.embeddings_file)
+                    
         print('  ... took {} sec'.format(time.time()-time0))
            
         self.analyze = CountVectorizer(stop_words='english').build_analyzer()
         return
     def info(self):
-       print ('The vocabulary is stored as a standard {} of len {}'.format(type(self.embeddings.vocab), len(self.embeddings.vocab)))
-       print ('There is also a {}, also of len {}'.format(type(self.embeddings.index2word), len(self.embeddings.index2word)))
-       print ('Here are the first 10 entries:  {}'.format(self.embeddings.index2word[:10])) 
-       vKing = self.embeddings['king']
-       print ('Length of our vectorization of "king" (see ctor of Word2Vec in make_embeddings) : {}'.format(len(vKing)))
-       print ('First full feature vector of "king":  {}'.format(vKing))
+        def info_wv(self, wv):
+            print('Word Embeddings.')
+            print('  Length:  {}.  First 3 words {}'.format(len(wv.vocab), wv.index2word[:3]))
+            print('  Example word embedding.  wv["{}"]:'.format('king'))
+            print('    V length:  {}, embedding follows:  {}'.format(
+             len(wv['king']), wv['king']))
+            
+        if self.doc2vec:
+            print('Document Embeddings.')
+            d2v = self.embeddings
+            print('  Length:  {}.  First 3 entries {}'.format(len(d2v.docvecs.doctags), 
+             d2v.docvecs.doctags.keys()[:3]))
+            tag0 = d2v.docvecs.doctags.keys()[0]
+            print('  Example document embedding.  d2v.docvecs["{}"]:'.format(tag0))
+            print('    V length:  {}, embedding follows:  {}'.format(
+             len(d2v.docvecs[tag0]), d2v.docvecs[tag0]))
+            print ('The word embeddings are available via the "wv" member:')
+            info_wv(self, d2v.wv)
+        else:
+            info_wv(self, self.embeddings)
 #
 
     def load_data(self, input):
@@ -58,37 +79,55 @@ class EmbeddingsTool():
 
         return self.df
     
-    def make_embeddings(self, input):
+    def make_embeddings(self):
         if 'GoogleNews' in self.embeddings_file: # Google's pre-trained model
             raise ValueError("attempting to overwrite the Google corpus.")
             
-        print('Loading input {}'.format(input))
-        time0 = time.time()
-        self.df = self.load_data(input)
-        print('  ... took {} sec'.format(time.time()-time0))
         sentences = self.df['title'] + ' ' + self.df['body']
-        sentences = [self.analyze(s) for s in sentences.tolist()]
+        self.df['tokenlist'] = [self.analyze(s) for s in sentences.tolist()]
         time0 = time.time()
-        print('Fitting embeddings ... (hard coded dimenstions is {})'.format(EmbeddingsTool.NDIM))
-        self.embeddings = word2vec.Word2Vec(sentences, size=EmbeddingsTool.NDIM, min_count=10, workers=4)
+        print('Fitting embeddings ... (hard coded dimensions is {})'.
+              format(EmbeddingsTool.NDIM))
+        if self.doc2vec:
+            taggeddocs = []
+            for i, tokenlist in enumerate(self.df.tokenlist):
+                td = TaggedDocument(tokenlist, [unicode(self.df.id[i])])
+                #print('{}, {}, {}'.format(i, self.df.id[i], tokenlist[:4]))
+                taggeddocs.append(td)
+            self.embeddings = doc2vec.Doc2Vec(taggeddocs, 
+             size=EmbeddingsTool.NDIM, window = 8, min_count=5, workers=4)
+        else:
+            self.embeddings = word2vec.Word2Vec(sentences, 
+             size=EmbeddingsTool.NDIM, min_count=10, workers=4)
         print('  ... took {} sec'.format(time.time()-time0))
         time0 = time.time()
         print('Saving embeddings to output {}'.format(self.embeddings_file))
-        self.embeddings.wv.save(self.embeddings_file)
+        if self.doc2vec:
+            print('writing doc2vec')
+            self.embeddings.delete_temporary_training_data(
+             keep_doctags_vectors=True, keep_inference=True)
+            self.embeddings.save(self.embeddings_file)
+        else:
+            self.embeddings.wv.save(self.embeddings_file)
         print('  ... took {} sec'.format(time.time()-time0))
         
         return
     
     def query(self, q):
         matches = []
-        time0 = time.time()
-        print('Querying embeddings ...')
-        if len(q.split()) == 1:
-            q = self.analyze(q)[0]
-            matches = self.embeddings.most_similar(positive=['{}'.format(q)])
-        else:
-            matches = eval('self.embeddings.{}'.format(q))
-        print('  ... took {} sec'.format(time.time()-time0))
+        if self.doc2vec:
+            d2v = self.embeddings.docvecs
+            if (len(q.split()) == 1):
+                q = self.analyze(q)[0]
+                matches = d2v.most_similar('{}'.format(q))
+            else:
+                matches = eval('d2v.{}'.format(q))
+        else:           
+            if len(q.split()) == 1:
+                q = self.analyze(q)[0]
+                matches = self.embeddings.most_similar(positive=['{}'.format(q)])
+            else:
+                matches = eval('self.embeddings.{}'.format(q))
         
         return matches
 
@@ -106,8 +145,12 @@ def main():
     retval = 0
     description = 'Embedding Tool, create, use,  CBOW embeddings and possibly other things.'
     epilog = '''Examples:
-    # this creates a an embeddings file from the reddit jokes data store
+    # word2vec embeddings
     python embedtool.py --make_embeddings reddit_jokes.json --embeddings_file jokes_cbow.model
+
+    # doc2vec embeddings
+    python embedtool.py --make_embeddings reddit_jokes.json --doc2vec --embeddings_file reddit.d2v.model
+
 
     # this shows how to load from disk and use that embeddings file (simplified)
     python embedtool.py --query king --embeddings_file jokes_cbow.model
@@ -119,6 +162,9 @@ def main():
         python embedtool.py --query "most_similar_cosmul(positive=['woman', 'king'], negative=['man'])"  --embeddings_file jokes_cbow.model
         python embedtool.py --query "doesnt_match('breakfast cereal lunch dinner'.split())"  --embeddings_file jokes_cbow.model
         python embedtool.py --query "similarity('woman', 'man')"  --embeddings_file jokes_cbow.model
+
+        python embedtool.py --query 4q6b2d  --embeddings_file reddit.d2v.model --doc2vec
+
 
     # you can also use the giant pretrained model from google, see here
     # http://mccormickml.com/2016/04/12/googles-pretrained-word2vec-model-in-python/
@@ -133,7 +179,9 @@ def main():
     '''
     parser = argparse.ArgumentParser(description=description, epilog=epilog, 
      formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('--make_embeddings', dest='make_embeddings')
+    parser.add_argument('--make_embeddings', dest='make_embeddings', action = 'store_true')
+    parser.add_argument('-i', dest='input_')
+    parser.add_argument('--doc2vec', dest='doc2vec', action='store_true')
     parser.add_argument('--embeddings_file', dest='embeddings_file', required=True)
     parser.add_argument('--query', dest='query', 
                          help="query the specified embeddings model: 'king' or 'most_similar(positive=['king', 'man'], negative=[woman])'")
@@ -144,19 +192,29 @@ def main():
 
     args = parser.parse_args()
     make_embeddings = args.make_embeddings
+    input_ = args.input_
+    doc2vec = args.doc2vec
     embeddings_file = args.embeddings_file
     query = args.query
     export = args.export
     info = args.info
 
-    tool = EmbeddingsTool(embeddings_file=embeddings_file)
+    tool = EmbeddingsTool(embeddings_file=embeddings_file, doc2vec=doc2vec)
+    
+    if input_:
+        tool.load_data(input_)
 
     if make_embeddings:   
-        tool.make_embeddings(make_embeddings)
+        tool.make_embeddings()
     
     if query:
-        m = tool.query(query)
-        print('{}'.format(m))
+        matches = tool.query(query)
+        print('{}'.format(matches))
+        if doc2vec:
+            for m, _ in matches:
+                mask = tool.df['id'] == m
+                print ('{}.  {} {}'.format(m, tool.df.loc[mask].title.to_string(), 
+                 tool.df.loc[mask].body.to_string()))
 
     if export:
         tool.csv_dump()
