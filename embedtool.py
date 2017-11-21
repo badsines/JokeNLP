@@ -99,11 +99,21 @@ class EmbeddingsTool():
                 td = TaggedDocument(tokenlist, [unicode(self.df.id[i])])
                 taggeddocs.append(td)
             self.embeddings = doc2vec.Doc2Vec(
-                taggeddocs,
+                alpha=0.025, min_alpha=0.025,
                 size=EmbeddingsTool.NDIM,
                 window=8,
                 min_count=5,
                 workers=4)
+            # to do:  continue training
+            self.embeddings .build_vocab(taggeddocs)
+            print('  ... build_vocab took {} sec'.format(time.time() - time0))
+            for epoch in range(10):
+                self.embeddings .train(taggeddocs,
+                total_examples=self.embeddings.corpus_count,
+                epochs=self.embeddings.iter)
+                print('  ... training epoch {} through {} sec'.format(epoch, time.time() - time0))
+                self.embeddings .alpha -= 0.002  # decrease the learning rate
+                self.embeddings .min_alpha = self.embeddings.alpha  # fix the learning rate, no decay
         else:
             self.embeddings = word2vec.Word2Vec(
                 sentences, size=EmbeddingsTool.NDIM, min_count=10, workers=4)
