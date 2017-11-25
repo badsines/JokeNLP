@@ -196,7 +196,11 @@ def main():
         python embedtool.py --query "doesnt_match('breakfast cereal lunch dinner'.split())"  --embeddings_file jokes_cbow.model
         python embedtool.py --query "similarity('woman', 'man')"  --embeddings_file jokes_cbow.model
 
-        python embedtool.py --query 4q6b2d  --embeddings_file reddit.d2v.model --doc2vec
+        # Find duplicate jokes based on doc2vec similarity
+        python embedtool.py -i reddit_jokes.json --query 1ah5m2  --embeddings_file reddit.d2v.model --doc2vec
+
+        # Blonde jokes
+        python embedtool.py -i reddit_jokes.json --query 1b36gi  --embeddings_file reddit.d2v.model --doc2vec
 
 
     # you can also use the giant pretrained model from google, see here
