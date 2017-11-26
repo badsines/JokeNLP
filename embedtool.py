@@ -69,10 +69,10 @@ class EmbeddingsTool():
                 len(d2v.docvecs.doctags), d2v.docvecs.doctags.keys()[:3]))
             tag0 = d2v.docvecs.doctags.keys()[0]
             print(
-                '  Example document embedding.  d2v.docvecs["{}"]:'.format(tag0))
+             '  Example document embedding.  d2v.docvecs["{}"]:'.format(tag0))
             print('    V length:  {}, embedding follows:  {}'.format(
                 len(d2v.docvecs[tag0]), d2v.docvecs[tag0]))
-            print ('The word embeddings are available via the "wv" member:')
+            print('The word embeddings are available via the "wv" member:')
             info_wv(self, d2v.wv)
         else:
             info_wv(self, self.embeddings)
@@ -108,15 +108,19 @@ class EmbeddingsTool():
             self.embeddings .build_vocab(taggeddocs)
             print('  ... build_vocab took {} sec'.format(time.time() - time0))
             for epoch in range(10):
-                self.embeddings .train(taggeddocs,
-                total_examples=self.embeddings.corpus_count,
-                epochs=self.embeddings.iter)
-                print('  ... training epoch {} through {} sec'.format(epoch, time.time() - time0))
-                self.embeddings .alpha -= 0.002  # decrease the learning rate
-                self.embeddings .min_alpha = self.embeddings.alpha  # fix the learning rate, no decay
+                self.embeddings .train(
+                        taggeddocs,
+                        total_examples=self.embeddings.corpus_count,
+                        epochs=self.embeddings.iter)
+                print('  ... training epoch {} through {} sec'.format(
+                        epoch, time.time() - time0))
+                self.embeddings .alpha -= 0.002
+                self.embeddings .min_alpha = self.embeddings.alpha
         else:
+            # build the embeddings by training the network, 1 call.
             self.embeddings = word2vec.Word2Vec(
-                sentences, size=EmbeddingsTool.NDIM, min_count=10, workers=4)
+                self.df.tokenlist, size=EmbeddingsTool.NDIM, min_count=10,
+                workers=4)
         print('  ... took {} sec'.format(time.time() - time0))
         time0 = time.time()
         print('Saving embeddings to output {}'.format(self.embeddings_file))
@@ -179,10 +183,10 @@ def main():
     description = 'Embedding Tool, create, use, various text embeddings.'
     epilog = '''Examples:
     # word2vec embeddings
-    python embedtool.py --make_embeddings reddit_jokes.json --embeddings_file jokes_cbow.model
+    python embedtool.py --make_embeddings -i reddit_jokes.json --embeddings_file jokes_cbow.model
 
     # doc2vec embeddings
-    python embedtool.py --make_embeddings reddit_jokes.json --doc2vec --embeddings_file reddit.d2v.model
+    python embedtool.py --make_embeddings -i reddit_jokes.json --doc2vec --embeddings_file reddit.d2v.model
 
 
     # this shows how to load from disk and use that embeddings file (simplified)
@@ -271,7 +275,7 @@ def main():
             for m, _ in matches:
                 i = np.where(tool.df.id == m)[0][0]
                 s = tool.df.title.iloc[i] + ' ' + tool.df.body.iloc[i]
-                print('{}. {}'.format(i, s))
+                print('{}. {}'.format(i, s.encode('utf-8')))
 
     if export:
         tool.csv_dump()
