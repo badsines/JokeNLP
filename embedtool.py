@@ -9,6 +9,8 @@ from gensim.models import word2vec
 from gensim.models import doc2vec
 from gensim.models.keyedvectors import KeyedVectors
 from gensim.models.doc2vec import TaggedDocument
+from sklearn.decomposition import LatentDirichletAllocation
+from sklearn.externals import joblib
 
 from sklearn.feature_extraction.text import CountVectorizer
 
@@ -31,14 +33,19 @@ class EmbeddingsTool():
         '''
 
         self.embeddings_file = kwargs['embeddings_file']
+        self.lda_file = 'lda.model'
+        self.tf_file = 'tf.model'
+        
         self.doc2vec = kwargs['doc2vec']
         time0 = time.time()
-        print('loading embeddings file {}'.format(self.embeddings_file))
         if os.path.exists(self.embeddings_file):
             # Google's Pre-trained model.
             if 'GoogleNews' in self.embeddings_file:
+                print('loading Google pretrained model file {}'.format(
+                    self.embeddings_file))
                 self.embeddings = KeyedVectors.load_word2vec_format(
                     self.embeddings_file, binary=True)
+                print('  ... took {} sec'.format(time.time() - time0))
             else:  # One of our "make_embeddings" models
                 if self.doc2vec:
                     self.embeddings = doc2vec.Doc2Vec.load(
@@ -46,9 +53,12 @@ class EmbeddingsTool():
                 else:
                     self.embeddings = KeyedVectors.load(self.embeddings_file)
 
-        print('  ... took {} sec'.format(time.time() - time0))
+        if os.path.exists(self.lda_file):
+            self.lda = joblib.load(self.lda_file)
 
-        self.analyze = CountVectorizer(stop_words='english').build_analyzer()
+        self.tf_vectorizer = CountVectorizer(
+                max_df=0.95, min_df=2, max_features=1000,
+                stop_words='english')
         return
 
     def info(self):
@@ -88,8 +98,14 @@ class EmbeddingsTool():
         if 'GoogleNews' in self.embeddings_file:  # Google's pre-trained model
             raise ValueError("attempting to overwrite the Google corpus.")
 
-        sentences = self.df['title'] + ' ' + self.df['body']
-        self.df['tokenlist'] = [self.analyze(s) for s in sentences.tolist()]
+        self.df['sentences'] = self.df['title'] + ' ' + self.df['body']
+        self.df.drop_duplicates(subset='sentences', inplace=True)
+
+        # Strips out punctuation, Lower cases, removes English stop words
+        # and white space.  Leaves numbers
+        analyze = self.tf_vectorizer.build_analyzer()
+
+        self.df['tokenlist'] = [analyze(s) for s in self.df.sentences.tolist()]
         time0 = time.time()
         print('Fitting embeddings ... (hard coded dimensions is {})'.
               format(EmbeddingsTool.NDIM))
@@ -133,8 +149,35 @@ class EmbeddingsTool():
             self.embeddings.wv.save(self.embeddings_file)
         print('  ... took {} sec'.format(time.time() - time0))
 
+        # LDA
+        # Use tf (raw term count) features for LDA
+        print('Getting tf ..')
+        tf = self.tf_vectorizer.fit_transform(self.df.sentences)
+        # compare tf and self.df.tokenlist
+        self.lda = LatentDirichletAllocation(
+                n_components=50, max_iter=5, learning_method='online',
+                learning_offset=50., random_state=0)
+        time0 = time.time()
+        print('Training LDA ...')
+        self.lda.fit(tf)
+        print('  ... took {} sec'.format(time.time() - time0))
+        joblib.dump(self.lda, self.lda_file)
+        joblib.dump(self.tf_vectorizer.vocabulary_, self.tf_file)
         return
 
+    def dumptopics(self, n_top_words):
+        if os.path.exists(self.tf_file):
+            self.vocab = joblib.load(self.tf_file)
+        self.tf_vectorizer = CountVectorizer(vocabulary=self.vocab)
+        self.tf_vectorizer._validate_vocabulary()
+        feature_names = self.tf_vectorizer.get_feature_names()
+
+        for topic_idx, topic in enumerate(self.lda.components_):
+            message = "Topic #%d: " % topic_idx
+            message += " ".join([feature_names[i] for i in topic.argsort()[
+                    :-n_top_words - 1:-1]])
+            print(message)
+                
     def query(self, q):
         '''Execute Queries against the model.
 
@@ -246,6 +289,11 @@ def main():
         dest='info',
         action='store_true',
         help='dump out some info about the embeddings (vector size, vocab size ...)')
+    parser.add_argument(
+        '--dumptopics',
+        dest='dumptopics',
+        action='store_true',
+        help='Example using the LDA Topic Clusterer')
 
     args = parser.parse_args()
     make_embeddings = args.make_embeddings
@@ -255,6 +303,7 @@ def main():
     query = args.query
     export = args.export
     info = args.info
+    dumptopics = args.dumptopics
 
     tool = EmbeddingsTool(embeddings_file=embeddings_file, doc2vec=doc2vec)
 
@@ -282,6 +331,9 @@ def main():
 
     if info:
         tool.info()
+
+    if dumptopics:
+        tool.dumptopics(10)
 
     return retval
 
