@@ -1,18 +1,20 @@
 # SET PATH
 
-packages <- c("jsonlite", "dplyr", "purrr", "ggplot2")
+library(jsonlite)
+library(dplyr)
 library(tm)
 library(SnowballC)
 library(stringr)
 library(slam)
 library(tidytext)
 library(tidyr)
+library(topicmodels)
 set.seed(123)
 
 
 df <- fromJSON("reddit_jokes.json")
 
-df$document <- as.character(1:nrow(df))
+
 df$num_id <- strtoi(df$id, base = 36) #the id's are actually base 36
 
 
@@ -30,6 +32,8 @@ df <- df %>%
   left_join(uniq.df) %>%
   group_by(unq_id) %>%
   slice(which.max(score))
+
+df$document <- as.character(1:nrow(df))
 ###################################################### - Preprocessing and creating corpus
 
 df$fullbody <- paste(df$title, df$body)                   # combine title and body
