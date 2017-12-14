@@ -38,7 +38,7 @@ class EmbeddingsTool():
         
         self.doc2vec = kwargs['doc2vec']
         time0 = time.time()
-        if os.path.exists(self.embeddings_file):
+        if self.embeddings_file and os.path.exists(self.embeddings_file):
             # Google's Pre-trained model.
             if 'GoogleNews' in self.embeddings_file:
                 print('loading Google pretrained model file {}'.format(
@@ -57,7 +57,7 @@ class EmbeddingsTool():
             self.lda = joblib.load(self.lda_file)
 
         self.tf_vectorizer = CountVectorizer(
-                max_df=0.95, min_df=2, max_features=1000,
+                max_df=0.95, min_df=2, max_features=20000,
                 stop_words='english')
         return
 
@@ -155,8 +155,8 @@ class EmbeddingsTool():
         tf = self.tf_vectorizer.fit_transform(self.df.sentences)
         # compare tf and self.df.tokenlist
         self.lda = LatentDirichletAllocation(
-                n_components=50, max_iter=5, learning_method='online',
-                learning_offset=50., random_state=0)
+                n_components=50, max_iter=10, learning_method='online',
+                learning_offset=10., random_state=0)
         time0 = time.time()
         print('Training LDA ...')
         self.lda.fit(tf)
@@ -273,8 +273,7 @@ def main():
     parser.add_argument('--doc2vec', dest='doc2vec', action='store_true')
     parser.add_argument(
         '--embeddings_file',
-        dest='embeddings_file',
-        required=True)
+        dest='embeddings_file')
     parser.add_argument(
         '--query',
         dest='query',
