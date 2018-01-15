@@ -3,7 +3,7 @@ from pandas import read_json
 import bs_embeddings
 
 # this is the API entry point.  It loads our model from disk
-# building it as necessary.  This assumes that reddit_jokes.json and optionally, 
+# building it as necessary.  This assumes that reddit_jokes.json and optionally,
 # GoogleNews-vectors-negative300.bin.gz are in the current directory.
 bse = bs_embeddings.bs_embeddings()
 

@@ -15,6 +15,8 @@ class bs_embeddings():
     # These two files are assumed to be in the CWD.
     JOKES_D2V_MODEL='jokes.d2v.model'
     GOOGLE_W2V_MODEL='GoogleNews-vectors-negative300.bin.gz'
+    np.seterr(divide='ignore', invalid='ignore') # to ignore joke_vec /= division error below
+
     def __init__(self, *args, **kwargs):
 
         self.tf_vectorizer = CountVectorizer(
@@ -52,7 +54,7 @@ class bs_embeddings():
             taggeddocs = []
             time0 = time.time()
             for i, tokenlist in enumerate(self.df.tokenlist):
-                td = TaggedDocument(tokenlist, [unicode(self.df.iloc[i].id)])
+                td = TaggedDocument(tokenlist, [str(self.df.iloc[i].id)])
                 taggeddocs.append(td)
             self.embeddings = doc2vec.Doc2Vec(
                 alpha=0.025, min_alpha=0.025,
@@ -87,7 +89,7 @@ class bs_embeddings():
             for token in tokenlist:
                 if token in self.jokes_d2v_model.wv.vocab:
                     joke_vec += self.jokes_d2v_model.wv[token]
-            joke_vec /= float(len(tokenlist))
+            joke_vec /= float(len(tokenlist)) # see np.seterr function to allow invalid division
             result.append(joke_vec)
         return np.array(result)
 
@@ -102,7 +104,7 @@ class bs_embeddings():
             for token in tokenlist:
                 if token in self.google_model.vocab:
                     joke_vec += self.google_model[token]
-            joke_vec /= float(len(tokenlist))
+            joke_vec /= float(len(tokenlist)) # see np.seterr function to allow invalid division
             result.append(joke_vec)
         return np.array(result)
 
