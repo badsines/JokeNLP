@@ -43,7 +43,7 @@ class bs_embeddings():
         if os.path.exists(jokes_json):
             self.df  = read_json(jokes_json)
             self.df['sentences'] = self.df['title'] + ' ' + self.df['body']
-            self.df.drop_duplicates(subset='sentences', inplace=True)
+            #self.df.drop_duplicates(subset='sentences', inplace=True)
 
             # Strips out punctuation, Lower cases, removes English stop words
             # and white space.  Leaves numbers

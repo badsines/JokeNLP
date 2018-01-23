@@ -195,7 +195,7 @@ class EmbeddingsTool():
         if self.doc2vec:
             d2v = self.embeddings.docvecs
             if (len(q.split()) == 1):
-                q = self.analyze(q)[0]
+                #q = self.analyze(q)[0]
                 matches = d2v.most_similar('{}'.format(q))
             else:
                 matches = eval('d2v.{}'.format(q))

@@ -13,13 +13,13 @@ print(df.head())
 
 # Preprocessing.  Nothing happening with our embeddings here.
 df['sentences'] = df['title'] + ' ' + df['body']
-df.drop_duplicates(subset='sentences', inplace=True)
+#df.drop_duplicates(subset='sentences', inplace=True)
 analyze = bse.tf_vectorizer.build_analyzer()
 df['tokenlist'] = [analyze(s) for s in df.sentences.tolist()]
 
 # Use bs_embeddings object to get the vectorizations of jokes
 df['mean_w2v_jokes'] = bse.mean_w2v_jokes(df.tokenlist).tolist()
-df['mean_w2v_google'] = bse.mean_w2v_google(df.tokenlist).tolist()
+#df['mean_w2v_google'] = bse.mean_w2v_google(df.tokenlist).tolist()
 df['d2v'] = bse.d2v(df.id)
 print(df.head())
 
@@ -28,7 +28,7 @@ print(df.head())
 # dimensions and more training.
 
 # Force a rebuild of our D2V model (200 dimensions, 15 epochs):
-bse.force_build_model(200, 15)
+bse.force_build_model(300, 25)
 # Use bs_embeddings object to get the vectorizations of jokes
 df['mean_w2v_jokes'] = bse.mean_w2v_jokes(df.tokenlist).tolist()
 df['d2v'] = bse.d2v(df.id)
