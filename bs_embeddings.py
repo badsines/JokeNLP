@@ -38,18 +38,21 @@ class bs_embeddings():
             print('    ... Done.')
 
     # Overwrite JOKES_D2V_MODEL file.
-    def force_build_model(self, ndim, nepochs):
+    def force_build_model(self, ndim, nepochs, df=None):
         jokes_json = 'reddit_jokes.json'
-        if os.path.exists(jokes_json):
-            self.df  = read_json(jokes_json)
-            self.df['sentences'] = self.df['title'] + ' ' + self.df['body']
-            #self.df.drop_duplicates(subset='sentences', inplace=True)
+        if os.path.exists(jokes_json) or df:
+            if df is None:
+                self.df  = read_json(jokes_json)
+                self.df['sentences'] = self.df['title'] + ' ' + self.df['body']
+                #self.df.drop_duplicates(subset='sentences', inplace=True)
 
-            # Strips out punctuation, Lower cases, removes English stop words
-            # and white space.  Leaves numbers
-            analyze = self.tf_vectorizer.build_analyzer()
+                # Strips out punctuation, Lower cases, removes English stop words
+                # and white space.  Leaves numbers
+                analyze = self.tf_vectorizer.build_analyzer()
 
-            self.df['tokenlist'] = [analyze(s) for s in self.df.sentences.tolist()]
+                self.df['tokenlist'] = [analyze(s) for s in self.df.sentences.tolist()]
+            else:
+                self.df = df
             print('Building D2V model ...')
             taggeddocs = []
             time0 = time.time()

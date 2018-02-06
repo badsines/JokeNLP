@@ -1,93 +1,97 @@
+from collections import defaultdict
 import time
 import numpy as np
-from pandas import read_json
+from pandas import read_json, DataFrame
 import pickle
 
 import bs_embeddings
 
-def looks_like_duplicate(tokenlist1, tokenlist2):
-    common = [e for e in tokenlist1 if e in tokenlist2]
-    l = max(len(tokenlist1), len(tokenlist2))
-    cf = len(common)/float(l)
-    if cf > 0.5 :
+def looks_like_duplicate(prev, curr):
+    if prev == None:
+        return False
+    common = [e for e in curr.tokenlist if e in prev.tokenlist]
+    l = max(len(curr.tokenlist), len(prev.tokenlist))
+    cf = len(common)/float(l) if l > 0 else 1
+    if curr.joke == prev.joke:
+        return True # identical jokes
+    if l == 0:
+        return curr.joke == prev.joke # very short jokes must match exactly
+    if l < 5 and cf == 1.0: 
         return True
-    #if cf > 0.25:
-    #    print('SIMILAR NOT DUP')
-    #    print('  ** distance:  {}, common token factor {}'.format(dist, cf))
-    #    #print('    {}'.format(tokenlist1))
-    #    #print('    {}'.format(tokenlist2))
-    #    print('    ** {}'.format(joke1))
-    #    print('    ** {}'.format(joke2))
+    elif cf > 0.9:
+        return True
+    return False
 
+print('Loading bs_embeddings object...')
 bse = bs_embeddings.bs_embeddings()
 
-# This is the D2V model built with duplicates included.
-print('Running force_build_model ...')
-bse.force_build_model(300, 25)
-
 # Now we load the joke database and configure it.
+print('Loading reddit_jokes dataframe ...')
 df = read_json('reddit_jokes.json')
 df['joke'] = df['title'] + ' ' + df['body']
-#df.drop_duplicates(subset='joke', inplace=True)
 analyze = bse.tf_vectorizer.build_analyzer()
-df['tokenlist'] = [analyze(s) for s in df.joke.tolist()]
+df['tokenlist'] = [sorted(l) for l in [analyze(s) for s in df.joke.tolist()]]
+df.sort_values('tokenlist', inplace=True)
+N=0
+# Iteratively pass through DF removing adjacent rows that appear to be duplicates
+# We need to do this multiple times b/c we do not require exact matches to be duplicates.
+while True:
+    print('serializing to disk...')
+    df.to_pickle('jokes.df.pickle')
+    print('serializing from disk...')
+    with open('jokes.df.pickle', 'rb') as pickle_file:
+        df = pickle.load(pickle_file)
+    N = N+1
+    print('***************  Starting iteration N = {}  *************'.format(N))
+    prev = None
+    initCount = len(df.index)
+    dupCount = 0
+    exactDupCount = 0
+    duplicates = []
+    updates = defaultdict(int)
+    for curr in df.itertuples():
+        line = ' '.join(curr.tokenlist)
+        if not looks_like_duplicate(prev, curr):
+           printsource = True
+           src = curr
+        else:
+           if printsource:
+               print('*** Duplicated: {}'.format(src.joke.encode('utf-8')[:128] ))
+               #print('*** {}'.format(src.tokenlist))
+               printsource = False
+           print('   *** Matched  {}.'.format(curr.joke.encode('utf-8')[:128]))
+           #print('    {}'.format(curr.tokenlist))
+           if curr.score > src.score:
+               updates[src.Index] = curr.score
+           duplicates.append(curr.Index)
+           dupCount += 1
+           if curr.joke == src.joke:
+               exactDupCount += 1
+        prev = curr
 
+    print('Init Count {}, Duplicates {}, Exact Duplicates {}'.format(initCount, dupCount, exactDupCount))
+    print('Ready to remove {} duplicates and update {} rows.'.format(len(duplicates), len(updates)))
+    if len(duplicates) == 0:
+        print ("\n\n *** Yay done:  serialized from disk and found no duplicates\n\n")
+        break;
+    df.drop(duplicates, inplace=True)
+    updates_df = DataFrame.from_dict(updates, orient='index')
+    updates_df.columns = ['score']
+    df.update(updates_df)
 
+    # verify that scores got updated.
+    for id in updates:
+        #print('updates[{}]=={}, df.loc[{}].score=={}'.format(id, updates[id], id, df.loc[id].score))
+        assert updates[id] == df.loc[id].score
+    print('Final Count:  {}'.format(len(df.index)))
 
-L0 = df.shape[0]
+print('Rebuilding the Doc2Vec Model with duplicates removed.')
+bse.force_build_model(300, 25, df=df)
 
-# Now we remove duplicates based a cosine distance
-# criteria plus some scrutiny about the gross overlap
-# of the duplicate tokenlists.
-low_bar = 0.90
-ndups = 0
-ndups2 = 0
-ids = df.id
-todrop = []
-for ii, id in enumerate(ids):
-    if ii % 500 == 0:
-        print('(progress {}):  Joke {} of {}'.format(time.strftime("%Y-%m-%d %H:%M"), ii, df.shape[0]))
-    if id in df.id.values:
-        i = np.where(df.id == id)[0][0] # np.where returns a tuple of ndarrays 
-    else:
-        continue
-    joke1 = df.iloc[i].joke.encode('utf-8')
-    l = len(df.iloc[i].tokenlist)
-    matches = bse.jokes_d2v_model.docvecs.most_similar(id)
-    if matches[0][1] > low_bar:
-        #print('Source Joke (id {}, len {}, score {}):  {}'.format(id, l, df.score.iloc[i], joke1))
-        for m, dist in matches:
-            if m in df.id.values:
-                j = np.where(df.id == m)[0][0]
-            else:
-                continue
-            joke2 = df.joke.iloc[j].encode('utf-8')
-            if looks_like_duplicate(df.iloc[i].tokenlist, df.iloc[j].tokenlist):
-                ndups += 1
-                if joke1 == joke2:
-                    ndups2 += 1
-                # SettingWithCopyWarning here.  But why?
-                df.iloc[j].score = max(df.iloc[i].score, df.iloc[j].score)
-                l = len(df.iloc[j].tokenlist)
-                #if l < 7:  # print out some short duplicates so we can convince ourselves its working.
-                    #print('  Matched Joke: ({}, id {}, len {}, score {}) {}'.format(dist, m, l, df.score.iloc[j], joke2))
-                if j in df.index:
-                    todrop.append(j)
-        #print('*'*80)
-    if len(todrop) > 500 or ii == len(ids)-1:
-        todrop = list(set(todrop))
-        df.drop(todrop, axis='index', inplace=True)
-        todrop = []
 # Add Vectorizations to rows that remain and save dataframe that can be used
 # for futher analysis
 df['mean_w2v_jokes'] = bse.mean_w2v_jokes(df.tokenlist).tolist()
 df['d2v'] = bse.d2v(df.id)
 df.to_pickle('jokes.df.pickle')
 
-with open('jokes.df.pickle', 'rb') as pickle_file:
-    df = pickle.load(pickle_file)
-
-print('Initially, we had {} jokes.'.format(L0))
-print('We removed {} duplicates of which {} where exact matches'.format(ndups, ndups2))
-print('Afterwards, we have {} jokes.'.format(df.shape[0]))
 print('... Now, go figure out how to predict the funny ones!')
