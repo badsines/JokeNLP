@@ -1,0 +1,29 @@
+(progress 2018-01-29 00:24):  Joke 183000 of 129634
+(progress 2018-01-29 00:27):  Joke 183500 of 129634
+(progress 2018-01-29 00:29):  Joke 184000 of 129634
+(progress 2018-01-29 00:32):  Joke 184500 of 129152
+(progress 2018-01-29 00:35):  Joke 185000 of 129152
+(progress 2018-01-29 00:37):  Joke 185500 of 129152
+(progress 2018-01-29 00:39):  Joke 186000 of 128665
+(progress 2018-01-29 00:41):  Joke 186500 of 128665
+
+(progress 2018-01-29 00:44):  Joke 187000 of 128665
+(progress 2018-01-29 00:47):  Joke 187500 of 128665
+(progress 2018-01-29 00:50):  Joke 188000 of 128197
+(progress 2018-01-29 00:52):  Joke 188500 of 128197
+(progress 2018-01-29 00:55):  Joke 189000 of 128197
+(progress 2018-01-29 00:58):  Joke 189500 of 128197
+(progress 2018-01-29 01:01):  Joke 190000 of 127716
+(progress 2018-01-29 01:04):  Joke 190500 of 127716
+(progress 2018-01-29 01:06):  Joke 191000 of 127716
+(progress 2018-01-29 01:08):  Joke 191500 of 127248
+(progress 2018-01-29 01:11):  Joke 192000 of 127248
+(progress 2018-01-29 01:14):  Joke 192500 of 127248
+(progress 2018-01-29 01:16):  Joke 193000 of 126772
+(progress 2018-01-29 01:20):  Joke 193500 of 126772
+(progress 2018-01-29 01:22):  Joke 194000 of 126772
+(progress 2018-01-29 01:26):  Joke 194500 of 126772
+Initially, we had 194553 jokes.
+We removed 91657 duplicates of which 4587 where exact matches
+Afterwards, we have 126311 jokes.
+... Now, go figure out how to predict the funny ones!
