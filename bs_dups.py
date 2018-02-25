@@ -16,7 +16,7 @@ def looks_like_duplicate(prev, curr):
         return True # identical jokes
     if l == 0:
         return curr.joke == prev.joke # very short jokes must match exactly
-    if l < 5 and cf == 1.0: 
+    if l < 5 and cf == 1.0:
         return True
     elif cf > 0.9:
         return True
@@ -27,7 +27,7 @@ bse = bs_embeddings.bs_embeddings()
 
 # Now we load the joke database and configure it.
 print('Loading reddit_jokes dataframe ...')
-df = read_json('reddit_jokes.json')
+df = read_json('data/reddit_jokes.json')
 df['joke'] = df['title'] + ' ' + df['body']
 analyze = bse.tf_vectorizer.build_analyzer()
 df['tokenlist'] = [sorted(l) for l in [analyze(s) for s in df.joke.tolist()]]
@@ -92,6 +92,6 @@ bse.force_build_model(300, 25, df=df)
 # for futher analysis
 df['mean_w2v_jokes'] = bse.mean_w2v_jokes(df.tokenlist).tolist()
 df['d2v'] = bse.d2v(df.id)
-df.to_pickle('jokes.df.pickle')
+df.to_pickle('data/jokes.df.pickle')
 
 print('... Now, go figure out how to predict the funny ones!')
